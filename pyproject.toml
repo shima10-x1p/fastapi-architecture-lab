@@ -5,3 +5,32 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9",
+    "ty>=0.0.1",  # beta — 破壊的変更の可能性あり
+]
+
+# ================================================================
+# ruff 設定
+# ================================================================
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+# E: pycodestyle / F: Pyflakes / I: isort / B: flake8-bugbear / UP: pyupgrade / N: pep8-naming
+select = ["E", "F", "I", "B", "UP", "N"]
+ignore = [
+    "E501",  # 行長は formatter に委ねる
+    "B008",  # デフォルト引数での関数呼び出し（FastAPI の Depends パターンで多用）
+]
+fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # テストでの assert を許可
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

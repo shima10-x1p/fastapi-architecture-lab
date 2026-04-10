@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "./.github/scripts/copilot-session-start.sh",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .\\.github\\scripts\\copilot-session-start.ps1",
+        "cwd": ".",
+        "timeoutSec": 120,
+        "comment": "セッション開始時に uv / ruff / ty の存在を確認し、不足していれば自動インストールを試みる"
+      }
+    ]
+  }
+}

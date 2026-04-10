@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "./.github/scripts/copilot-post-edit.sh",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .\\.github\\scripts\\copilot-post-edit.ps1",
+        "cwd": ".",
+        "timeoutSec": 60,
+        "comment": "Pythonファイル編集後に ruff（format + lint）と ty（型チェック）を実行する"
+      }
+    ]
+  }
+}
