@@ -1,0 +1,488 @@
+openapi: "3.1.0"
+
+info:
+  title: fastapi-architecture-lab API
+  version: "0.1.0"
+  description: |
+    Python 3.14 + FastAPI による Ports and Adapters アーキテクチャの検証 Lab。
+    Open Library の書誌情報を取り込み、個人の読書状態・ノートを管理する。
+
+servers:
+  - url: http://localhost:8000
+    description: ローカル開発サーバー
+
+tags:
+  - name: book-candidates
+    description: Open Library の外部書誌検索
+  - name: books
+    description: 取り込み済み書籍の管理
+  - name: notes
+    description: 書籍へのノート追加
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+
+  # ---------- 外部書誌検索 ----------
+  /v1/book-candidates:
+    get:
+      operationId: searchBookCandidates
+      summary: 外部書誌を検索する
+      description: |
+        Open Library の Search API を経由して書籍候補を返す。
+        結果はキャッシュされる（同一クエリの重複リクエストを抑制するため）。
+      tags: [book-candidates]
+      parameters:
+        - $ref: "#/components/parameters/queryParam"
+      responses:
+        "200":
+          description: 検索結果の書籍候補一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookCandidateListResponse"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  # ---------- 書籍一覧 / 書籍取り込み ----------
+  /v1/books:
+    get:
+      operationId: listBooks
+      summary: 取り込み済み書籍の一覧を取得する
+      tags: [books]
+      parameters:
+        - $ref: "#/components/parameters/statusFilter"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: 書籍一覧（ページネーション付き）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookListResponse"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /v1/books/import:
+    post:
+      operationId: importBook
+      summary: 外部書誌を取り込む
+      description: |
+        Open Library のキーを指定して書籍を取り込む。
+        既に取り込み済みの場合は 409 を返す。
+      tags: [books]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportBookRequest"
+      responses:
+        "201":
+          description: 取り込み完了
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  # ---------- 書籍詳細 / 読書状態更新 ----------
+  /v1/books/{bookId}:
+    parameters:
+      - $ref: "#/components/parameters/bookId"
+    get:
+      operationId: getBook
+      summary: 書籍の詳細を取得する
+      tags: [books]
+      responses:
+        "200":
+          description: 書籍詳細
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+    patch:
+      operationId: updateBook
+      summary: 読書状態を更新する
+      tags: [books]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookRequest"
+      responses:
+        "200":
+          description: 更新後の書籍詳細
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  # ---------- ノート追加 ----------
+  /v1/books/{bookId}/notes:
+    parameters:
+      - $ref: "#/components/parameters/bookId"
+    post:
+      operationId: addNote
+      summary: 書籍にノートを追加する
+      tags: [notes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddNoteRequest"
+      responses:
+        "201":
+          description: 追加されたノート
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  # ---------- メタデータ再取得 ----------
+  /v1/books/{bookId}/metadata:refresh:
+    parameters:
+      - $ref: "#/components/parameters/bookId"
+    post:
+      operationId: refreshBookMetadata
+      summary: Open Library から書籍のメタデータを再取得する
+      description: |
+        書籍の著者・出版社・説明文などを Open Library から最新情報で上書きする。
+        カバー画像 URL も更新される。
+      tags: [books]
+      responses:
+        "200":
+          description: メタデータ更新後の書籍詳細
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+# ---------------------------------------------------------------------------
+# Components
+# ---------------------------------------------------------------------------
+components:
+
+  # ---------- Parameters ----------
+  parameters:
+    bookId:
+      name: bookId
+      in: path
+      required: true
+      description: 書籍の UUID
+      schema:
+        type: string
+        format: uuid
+        example: "01951a2b-3c4d-7e8f-9a0b-1c2d3e4f5a6b"
+
+    queryParam:
+      name: q
+      in: query
+      required: true
+      description: 検索キーワード（タイトル・著者名など）
+      schema:
+        type: string
+        minLength: 1
+        example: "Clean Architecture"
+
+    statusFilter:
+      name: status
+      in: query
+      required: false
+      description: 読書状態でフィルタリング
+      schema:
+        $ref: "#/components/schemas/ReadingStatus"
+
+    limit:
+      name: limit
+      in: query
+      required: false
+      description: 1ページあたりの最大件数
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    offset:
+      name: offset
+      in: query
+      required: false
+      description: 取得開始位置
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  # ---------- Schemas ----------
+  schemas:
+
+    ReadingStatus:
+      type: string
+      enum:
+        - want_to_read
+        - reading
+        - completed
+      description: |
+        - `want_to_read`: 読みたい
+        - `reading`: 読書中
+        - `completed`: 読了
+
+    BookCandidate:
+      type: object
+      description: Open Library から取得した書籍候補（未取り込み）
+      required:
+        - openLibraryKey
+        - title
+        - authors
+      properties:
+        openLibraryKey:
+          type: string
+          description: "Open Library の Works キー (例: /works/OL45804W)"
+          example: "/works/OL45804W"
+        title:
+          type: string
+          example: "Clean Architecture"
+        authors:
+          type: array
+          items:
+            type: string
+          example: ["Robert C. Martin"]
+        isbn:
+          type: ["string", "null"]
+          example: "9780134494166"
+        coverUrl:
+          type: ["string", "null"]
+          format: uri
+          example: "https://covers.openlibrary.org/b/id/8091016-M.jpg"
+        publisher:
+          type: ["string", "null"]
+          example: "Prentice Hall"
+        publishedYear:
+          type: ["integer", "null"]
+          example: 2017
+
+    BookCandidateListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookCandidate"
+
+    Book:
+      type: object
+      description: 取り込み済みの書籍
+      required:
+        - bookId
+        - openLibraryKey
+        - title
+        - authors
+        - status
+        - notes
+        - createdAt
+        - updatedAt
+      properties:
+        bookId:
+          type: string
+          format: uuid
+          example: "01951a2b-3c4d-7e8f-9a0b-1c2d3e4f5a6b"
+        openLibraryKey:
+          type: string
+          example: "/works/OL45804W"
+        title:
+          type: string
+          example: "Clean Architecture"
+        authors:
+          type: array
+          items:
+            type: string
+          example: ["Robert C. Martin"]
+        isbn:
+          type: ["string", "null"]
+          example: "9780134494166"
+        coverUrl:
+          type: ["string", "null"]
+          format: uri
+          example: "https://covers.openlibrary.org/b/id/8091016-M.jpg"
+        publisher:
+          type: ["string", "null"]
+          example: "Prentice Hall"
+        publishedYear:
+          type: ["integer", "null"]
+          example: 2017
+        description:
+          type: ["string", "null"]
+          example: "A craftsman's guide to software structure and design."
+        status:
+          $ref: "#/components/schemas/ReadingStatus"
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Note"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-04-10T09:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-04-10T12:30:00Z"
+
+    Note:
+      type: object
+      description: 書籍に紐づくノート
+      required:
+        - noteId
+        - content
+        - createdAt
+      properties:
+        noteId:
+          type: string
+          format: uuid
+          example: "0195dead-beef-7000-8000-000000000001"
+        content:
+          type: string
+          minLength: 1
+          example: "第3章のクリーンアーキテクチャの依存ルールが特に参考になった。"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-04-10T10:00:00Z"
+
+    BookListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - limit
+        - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Book"
+        total:
+          type: integer
+          description: フィルタ条件に一致する総件数
+          example: 42
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 0
+
+    ImportBookRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - openLibraryKey
+      properties:
+        openLibraryKey:
+          type: string
+          description: "Open Library の Works キー (例: /works/OL45804W)"
+          example: "/works/OL45804W"
+
+    UpdateBookRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          $ref: "#/components/schemas/ReadingStatus"
+
+    AddNoteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          example: "第3章のクリーンアーキテクチャの依存ルールが特に参考になった。"
+
+    HTTPValidationError:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationError"
+
+    ValidationError:
+      type: object
+      required: [loc, msg, type]
+      properties:
+        loc:
+          type: array
+          items:
+            type: ["string", "integer"]
+        msg:
+          type: string
+        type:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: エラーの概要
+          example: "Book not found"
+
+  # ---------- Responses ----------
+  responses:
+    NotFound:
+      description: 指定されたリソースが存在しない
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            detail: "Book not found"
+
+    Conflict:
+      description: リソースが既に存在する（重複取り込みなど）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            detail: "Book already imported"
+
+    UnprocessableEntity:
+      description: リクエストの形式・バリデーションエラー（FastAPI デフォルト）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/HTTPValidationError"
