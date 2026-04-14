@@ -1,0 +1,1 @@
+"""core.application.usecases のユニットテストパッケージ。"""
