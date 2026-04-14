@@ -1,4 +1,4 @@
-"""Unit tests for core.shared.settings."""
+"""core.shared.settings のユニットテスト。"""
 
 import pytest
 
@@ -7,14 +7,14 @@ from core.shared.settings import Settings, get_settings
 
 @pytest.fixture(autouse=True)
 def clear_settings_cache():
-    """Ensure each test starts with a fresh Settings instance."""
+    """各テストを新しい Settings インスタンスから開始させる。"""
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
 
 
 class TestSettingsDefaults:
-    """Settings should expose sensible defaults when no env vars are set."""
+    """環境変数が未設定でも妥当なデフォルト値を返すこと。"""
 
     def test_default_app_name(self):
         s = Settings()
@@ -29,7 +29,7 @@ class TestSettingsDefaults:
         assert s.log_level == "INFO"
 
     def test_default_log_format_contains_common_attributes(self):
-        # The default format must include the most useful LogRecord fields
+        # デフォルト形式には主要な LogRecord 属性を含める
         s = Settings()
         assert "%(asctime)s" in s.log_format
         assert "%(levelname)" in s.log_format
@@ -42,7 +42,7 @@ class TestSettingsDefaults:
 
 
 class TestSettingsEnvOverride:
-    """Environment variables (APP_ prefix) should override defaults."""
+    """環境変数（APP_ プレフィックス）でデフォルトを上書きできること。"""
 
     def test_override_log_level(self, monkeypatch):
         monkeypatch.setenv("APP_LOG_LEVEL", "DEBUG")
@@ -74,7 +74,7 @@ class TestSettingsEnvOverride:
 
 
 class TestGetSettings:
-    """get_settings() should return a cached singleton."""
+    """get_settings() がキャッシュ付きシングルトンを返すこと。"""
 
     def test_returns_settings_instance(self):
         assert isinstance(get_settings(), Settings)

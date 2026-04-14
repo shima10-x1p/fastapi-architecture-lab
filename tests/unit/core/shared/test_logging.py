@@ -1,4 +1,4 @@
-"""Unit tests for core.shared.logging."""
+"""core.shared.logging のユニットテスト。"""
 
 import logging
 
@@ -10,7 +10,7 @@ from core.shared.settings import Settings
 
 @pytest.fixture(autouse=True)
 def reset_root_logger():
-    """Restore root logger state after each test to avoid cross-test pollution."""
+    """テスト間汚染を避けるため、各テスト後に root logger を復元する。"""
     root = logging.getLogger()
     original_level = root.level
     original_handlers = root.handlers[:]
@@ -20,7 +20,7 @@ def reset_root_logger():
 
 
 def _make_settings(**kwargs) -> Settings:
-    """Build a Settings instance with test-friendly defaults."""
+    """テスト向けのデフォルト値で Settings インスタンスを組み立てる。"""
     defaults = {
         "app_name": "test-app",
         "env": "dev",
@@ -33,7 +33,7 @@ def _make_settings(**kwargs) -> Settings:
 
 
 class TestGetLogger:
-    """get_logger should return a properly named Logger."""
+    """get_logger が適切な名前の Logger を返すこと。"""
 
     def test_returns_logger_instance(self):
         logger = get_logger("mymodule")
@@ -44,13 +44,13 @@ class TestGetLogger:
         assert logger.name == "core.domain.book"
 
     def test_dunder_name_pattern(self):
-        # Simulate the typical call: get_logger(__name__)
+        # 一般的な呼び出し方 get_logger(__name__) を再現する
         logger = get_logger(__name__)
         assert logger.name == __name__
 
 
 class TestConfigureLogging:
-    """configure_logging should set up the root logger from Settings."""
+    """configure_logging が Settings から root logger を構成すること。"""
 
     def test_sets_root_level_info(self):
         configure_logging(_make_settings(log_level="INFO"))
@@ -65,7 +65,7 @@ class TestConfigureLogging:
         assert logging.getLogger().level == logging.WARNING
 
     def test_unknown_level_falls_back_to_info(self):
-        # An unrecognised level string must not silence all logs
+        # 不正なレベル文字列でもログが完全に無音にならないこと
         configure_logging(_make_settings(log_level="NONSENSE"))
         assert logging.getLogger().level == logging.INFO
 
