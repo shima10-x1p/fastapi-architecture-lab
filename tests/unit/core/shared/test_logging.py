@@ -1,6 +1,7 @@
 """core.shared.logging のユニットテスト。"""
 
 import logging
+from collections.abc import Iterator
 
 import pytest
 
@@ -9,80 +10,134 @@ from core.shared.settings import Settings
 
 
 @pytest.fixture(autouse=True)
-def reset_root_logger():
-    """テスト間汚染を避けるため、各テスト後に root logger を復元する。"""
+def restore_root_logger() -> Iterator[None]:
+    """各テスト後に root logger のレベルとハンドラを復元する。"""
     root = logging.getLogger()
     original_level = root.level
     original_handlers = root.handlers[:]
+
     yield
+
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+        if handler not in original_handlers:
+            handler.close()
+
     root.setLevel(original_level)
-    root.handlers = original_handlers
+
+    for handler in original_handlers:
+        root.addHandler(handler)
 
 
-def _make_settings(**kwargs) -> Settings:
-    """テスト向けのデフォルト値で Settings インスタンスを組み立てる。"""
-    defaults = {
+def _make_settings(**overrides: object) -> Settings:
+    """logging テストで使う Settings を最小構成で組み立てる。"""
+    defaults: dict[str, object] = {
         "app_name": "test-app",
         "env": "dev",
         "log_level": "INFO",
         "log_format": "%(levelname)s %(name)s %(message)s",
         "debug": False,
     }
-    defaults.update(kwargs)
+    defaults.update(overrides)
     return Settings.model_validate(defaults)
 
 
 class TestGetLogger:
-    """get_logger が適切な名前の Logger を返すこと。"""
+    """get_logger() が名前付き Logger を返すことを検証する。"""
 
-    def test_returns_logger_instance(self):
-        logger = get_logger("mymodule")
+    def test_returns_logger_with_requested_name(self) -> None:
+        # 準備
+        logger_name = "core.shared.logging"
+
+        # 実行
+        logger = get_logger(logger_name)
+
+        # 検証
         assert isinstance(logger, logging.Logger)
-
-    def test_logger_name_matches_argument(self):
-        logger = get_logger("core.domain.book")
-        assert logger.name == "core.domain.book"
-
-    def test_dunder_name_pattern(self):
-        # 一般的な呼び出し方 get_logger(__name__) を再現する
-        logger = get_logger(__name__)
-        assert logger.name == __name__
+        assert logger is logging.getLogger(logger_name)
+        assert logger.name == logger_name
 
 
 class TestConfigureLogging:
-    """configure_logging が Settings から root logger を構成すること。"""
+    """configure_logging() の root logger 再設定を検証する。"""
 
-    def test_sets_root_level_info(self):
-        configure_logging(_make_settings(log_level="INFO"))
-        assert logging.getLogger().level == logging.INFO
+    @pytest.mark.parametrize(
+        ("configured_level", "expected_level"),
+        [
+            ("INFO", logging.INFO),
+            ("debug", logging.DEBUG),
+            ("WARNING", logging.WARNING),
+        ],
+    )
+    def test_configures_root_and_handler_levels_from_setting(
+        self, configured_level: str, expected_level: int
+    ) -> None:
+        # 準備
+        settings = _make_settings(log_level=configured_level)
 
-    def test_sets_root_level_debug(self):
-        configure_logging(_make_settings(log_level="DEBUG"))
-        assert logging.getLogger().level == logging.DEBUG
+        # 実行
+        configure_logging(settings)
+        root = logging.getLogger()
+        handler = root.handlers[0]
 
-    def test_sets_root_level_warning(self):
-        configure_logging(_make_settings(log_level="WARNING"))
-        assert logging.getLogger().level == logging.WARNING
+        # 検証
+        assert root.level == expected_level
+        assert handler.level == expected_level
 
-    def test_unknown_level_falls_back_to_info(self):
-        # 不正なレベル文字列でもログが完全に無音にならないこと
-        configure_logging(_make_settings(log_level="NONSENSE"))
-        assert logging.getLogger().level == logging.INFO
+    def test_replaces_existing_handlers_with_single_stream_handler(self) -> None:
+        # 準備
+        root = logging.getLogger()
+        old_stream_handler = logging.StreamHandler()
+        old_null_handler = logging.NullHandler()
+        root.addHandler(old_stream_handler)
+        root.addHandler(old_null_handler)
 
-    def test_adds_stream_handler(self):
+        # 実行
         configure_logging(_make_settings())
-        handlers = logging.getLogger().handlers
-        assert any(isinstance(h, logging.StreamHandler) for h in handlers)
 
-    def test_applies_custom_log_format(self):
-        custom_fmt = "%(levelname)s | %(message)s"
-        configure_logging(_make_settings(log_format=custom_fmt))
+        # 検証
+        assert len(root.handlers) == 1
+        assert type(root.handlers[0]) is logging.StreamHandler
+        assert root.handlers[0] is not old_stream_handler
+        assert old_null_handler not in root.handlers
+
+    def test_applies_requested_formatter_to_installed_handler(self) -> None:
+        # 準備
+        custom_format = "%(levelname)s | %(message)s"
+
+        # 実行
+        configure_logging(_make_settings(log_format=custom_format))
         handler = logging.getLogger().handlers[0]
-        assert handler.formatter._fmt == custom_fmt
 
-    def test_repeated_calls_do_not_duplicate_handlers(self):
-        configure_logging(_make_settings())
-        configure_logging(_make_settings())
-        root_handlers = logging.getLogger().handlers
-        stream_handlers = [h for h in root_handlers if isinstance(h, logging.StreamHandler)]
-        assert len(stream_handlers) == 1
+        # 検証
+        assert handler.formatter is not None
+        assert handler.formatter._fmt == custom_format
+
+    def test_falls_back_to_info_for_unknown_log_level(self) -> None:
+        # 準備
+        settings = _make_settings(log_level="not-a-level")
+
+        # 実行
+        configure_logging(settings)
+
+        # 検証
+        assert logging.getLogger().level == logging.INFO
+
+    def test_reconfiguration_keeps_single_handler_and_updates_formatter(self) -> None:
+        # 準備
+        configure_logging(_make_settings(log_format="%(message)s"))
+        first_handler = logging.getLogger().handlers[0]
+        updated_format = "%(levelname)s %(message)s"
+
+        # 実行
+        configure_logging(
+            _make_settings(log_level="WARNING", log_format=updated_format)
+        )
+        root = logging.getLogger()
+
+        # 検証
+        assert root.level == logging.WARNING
+        assert len(root.handlers) == 1
+        assert root.handlers[0] is not first_handler
+        assert root.handlers[0].formatter is not None
+        assert root.handlers[0].formatter._fmt == updated_format

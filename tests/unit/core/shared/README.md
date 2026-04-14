@@ -4,31 +4,23 @@
 
 | クラス | テスト名 | 対象 | 観点 | 意図 |
 |---|---|---|---|---|
-| TestGetLogger | test_returns_logger_instance | get_logger | 正常系 | Logger インスタンスを返すこと |
-| TestGetLogger | test_logger_name_matches_argument | get_logger | 正常系 | 引数で指定した名前が Logger に設定されること |
-| TestGetLogger | test_dunder_name_pattern | get_logger | 正常系 | `__name__` パターンで正しい名前の Logger を返すこと |
-| TestConfigureLogging | test_sets_root_level_info | configure_logging | 正常系 | INFO レベルが root logger に設定されること |
-| TestConfigureLogging | test_sets_root_level_debug | configure_logging | 正常系 | DEBUG レベルが root logger に設定されること |
-| TestConfigureLogging | test_sets_root_level_warning | configure_logging | 正常系 | WARNING レベルが root logger に設定されること |
-| TestConfigureLogging | test_unknown_level_falls_back_to_info | configure_logging | 異常系 | 不正なレベル文字列で INFO にフォールバックすること |
-| TestConfigureLogging | test_adds_stream_handler | configure_logging | 正常系 | StreamHandler が追加されること |
-| TestConfigureLogging | test_applies_custom_log_format | configure_logging | 正常系 | カスタムフォーマットが適用されること |
-| TestConfigureLogging | test_repeated_calls_do_not_duplicate_handlers | configure_logging | 正常系 | 複数回呼び出してもハンドラが重複しないこと |
+| TestGetLogger | test_returns_logger_with_requested_name | get_logger | 正常系 | 指定した名前の Logger を取得できること |
+| TestConfigureLogging | test_configures_root_and_handler_levels_from_setting | configure_logging | 正常系/境界値 | 設定したログレベルが大小文字差を吸収して root logger と handler に反映されること |
+| TestConfigureLogging | test_replaces_existing_handlers_with_single_stream_handler | configure_logging | 正常系 | 既存 handler を置き換えて単一の StreamHandler を構成すること |
+| TestConfigureLogging | test_applies_requested_formatter_to_installed_handler | configure_logging | 正常系 | 設定したフォーマッタが追加された handler に適用されること |
+| TestConfigureLogging | test_falls_back_to_info_for_unknown_log_level | configure_logging | 異常系 | 不正なログレベル文字列では INFO にフォールバックすること |
+| TestConfigureLogging | test_reconfiguration_keeps_single_handler_and_updates_formatter | configure_logging | 回帰 | 再設定時も handler が増殖せず最新フォーマットへ更新されること |
 
 ## test_settings.py
 
 | クラス | テスト名 | 対象 | 観点 | 意図 |
 |---|---|---|---|---|
-| TestSettingsDefaults | test_default_app_name | Settings | 正常系 | デフォルトの app_name が正しいこと |
-| TestSettingsDefaults | test_default_env | Settings | 正常系 | デフォルトの env が dev であること |
-| TestSettingsDefaults | test_default_log_level | Settings | 正常系 | デフォルトの log_level が INFO であること |
-| TestSettingsDefaults | test_default_log_format_contains_common_attributes | Settings | 正常系 | デフォルトの log_format に主要属性が含まれること |
-| TestSettingsDefaults | test_default_debug_is_false | Settings | 正常系 | デフォルトの debug が False であること |
-| TestSettingsEnvOverride | test_override_log_level | Settings | 正常系 | 環境変数で log_level を上書きできること |
-| TestSettingsEnvOverride | test_override_log_format | Settings | 正常系 | 環境変数で log_format を上書きできること |
-| TestSettingsEnvOverride | test_override_env | Settings | 正常系 | 環境変数で env を上書きできること |
-| TestSettingsEnvOverride | test_override_debug | Settings | 正常系 | 環境変数で debug を上書きできること |
-| TestSettingsEnvOverride | test_invalid_env_value_raises | Settings | 異常系 | 不正な env 値で ValidationError が発生すること |
-| TestGetSettings | test_returns_settings_instance | get_settings | 正常系 | Settings インスタンスを返すこと |
-| TestGetSettings | test_same_instance_on_repeated_calls | get_settings | 正常系 | 繰り返し呼び出しで同一インスタンスを返すこと |
-| TestGetSettings | test_cache_clear_creates_new_instance | get_settings | 正常系 | キャッシュクリア後に新しいインスタンスを返すこと |
+| TestSettingsInitialization | test_uses_declared_defaults_when_app_env_vars_are_missing | Settings | 正常系 | APP_ 環境変数が未設定のとき定義済みデフォルト値を使うこと |
+| TestSettingsInitialization | test_default_log_format_contains_common_logrecord_attributes | Settings | 正常系 | デフォルトの log_format に主要な LogRecord 属性が含まれること |
+| TestSettingsInitialization | test_loads_values_from_dotenv_when_environment_is_missing | Settings | 正常系 | 環境変数が未設定なら `.env` の値を読み込むこと |
+| TestSettingsInitialization | test_environment_variables_override_dotenv_values | Settings | 正常系 | 環境変数が `.env` より優先されること |
+| TestSettingsInitialization | test_allows_app_prefixed_environment_variables_to_override_defaults | Settings | 正常系 | APP_ プレフィックスの環境変数で各設定を上書きできること |
+| TestSettingsInitialization | test_ignores_environment_variables_without_app_prefix | Settings | 境界値 | APP_ に似ていてもプレフィックス不一致の環境変数は設定値に影響しないこと |
+| TestSettingsInitialization | test_rejects_unknown_env_values | Settings | 異常系 | 許可されていない env 値では ValidationError になること |
+| TestGetSettings | test_returns_cached_instance_while_cache_is_warm | get_settings | 正常系 | キャッシュが有効な間は同一インスタンスを返し続けること |
+| TestGetSettings | test_reloads_settings_after_cache_clear | get_settings | 正常系 | キャッシュクリア後は最新環境を反映した新しいインスタンスを返すこと |

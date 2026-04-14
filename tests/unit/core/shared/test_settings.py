@@ -1,90 +1,190 @@
 """core.shared.settings のユニットテスト。"""
 
+from collections.abc import Iterator
+from pathlib import Path
+
 import pytest
+from pydantic import ValidationError
 
 from core.shared.settings import Settings, get_settings
 
+APP_SETTING_ENV_VARS = (
+    "APP_APP_NAME",
+    "APP_ENV",
+    "APP_LOG_LEVEL",
+    "APP_LOG_FORMAT",
+    "APP_DEBUG",
+)
+
 
 @pytest.fixture(autouse=True)
-def clear_settings_cache():
-    """各テストを新しい Settings インスタンスから開始させる。"""
+def isolate_settings_resolution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Iterator[None]:
+    """設定解決に影響する環境とキャッシュをテストごとに隔離する。"""
+    for env_name in APP_SETTING_ENV_VARS:
+        monkeypatch.delenv(env_name, raising=False)
+
+    monkeypatch.chdir(tmp_path)
     get_settings.cache_clear()
+
     yield
+
     get_settings.cache_clear()
 
 
-class TestSettingsDefaults:
-    """環境変数が未設定でも妥当なデフォルト値を返すこと。"""
+class TestSettingsInitialization:
+    """Settings の生成と値の解決順序を検証する。"""
 
-    def test_default_app_name(self):
-        s = Settings()
-        assert s.app_name == "fastapi-architecture-lab"
+    @pytest.mark.parametrize(
+        ("field_name", "expected"),
+        [
+            ("app_name", "fastapi-architecture-lab"),
+            ("env", "dev"),
+            ("log_level", "INFO"),
+            ("debug", False),
+        ],
+    )
+    def test_uses_declared_defaults_when_app_env_vars_are_missing(
+        self, field_name: str, expected: str | bool
+    ) -> None:
+        # 準備
 
-    def test_default_env(self):
-        s = Settings()
-        assert s.env == "dev"
+        # 実行
+        settings = Settings()
 
-    def test_default_log_level(self):
-        s = Settings()
-        assert s.log_level == "INFO"
+        # 検証
+        assert getattr(settings, field_name) == expected
 
-    def test_default_log_format_contains_common_attributes(self):
-        # デフォルト形式には主要な LogRecord 属性を含める
-        s = Settings()
-        assert "%(asctime)s" in s.log_format
-        assert "%(levelname)" in s.log_format
-        assert "%(name)s" in s.log_format
-        assert "%(message)s" in s.log_format
+    def test_default_log_format_contains_common_logrecord_attributes(self) -> None:
+        # 準備
 
-    def test_default_debug_is_false(self):
-        s = Settings()
-        assert s.debug is False
+        # 実行
+        settings = Settings()
 
+        # 検証
+        assert "%(asctime)s" in settings.log_format
+        assert "%(levelname)" in settings.log_format
+        assert "%(name)s" in settings.log_format
+        assert "%(message)s" in settings.log_format
 
-class TestSettingsEnvOverride:
-    """環境変数（APP_ プレフィックス）でデフォルトを上書きできること。"""
+    def test_loads_values_from_dotenv_when_environment_is_missing(
+        self, tmp_path: Path
+    ) -> None:
+        # 準備
+        tmp_path.joinpath(".env").write_text(
+            "APP_ENV=staging\nAPP_DEBUG=true\n",
+            encoding="utf-8",
+        )
 
-    def test_override_log_level(self, monkeypatch):
-        monkeypatch.setenv("APP_LOG_LEVEL", "DEBUG")
-        s = Settings()
-        assert s.log_level == "DEBUG"
+        # 実行
+        settings = Settings()
 
-    def test_override_log_format(self, monkeypatch):
-        custom_fmt = "%(levelname)s | %(message)s"
-        monkeypatch.setenv("APP_LOG_FORMAT", custom_fmt)
-        s = Settings()
-        assert s.log_format == custom_fmt
+        # 検証
+        assert settings.env == "staging"
+        assert settings.debug is True
 
-    def test_override_env(self, monkeypatch):
-        monkeypatch.setenv("APP_ENV", "prod")
-        s = Settings()
-        assert s.env == "prod"
+    def test_environment_variables_override_dotenv_values(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        # 準備
+        tmp_path.joinpath(".env").write_text(
+            "APP_ENV=prod\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("APP_ENV", "staging")
 
-    def test_override_debug(self, monkeypatch):
-        monkeypatch.setenv("APP_DEBUG", "true")
-        s = Settings()
-        assert s.debug is True
+        # 実行
+        settings = Settings()
 
-    def test_invalid_env_value_raises(self, monkeypatch):
-        from pydantic import ValidationError
+        # 検証
+        assert settings.env == "staging"
 
+    @pytest.mark.parametrize(
+        ("env_name", "raw_value", "field_name", "expected"),
+        [
+            ("APP_APP_NAME", "from-env", "app_name", "from-env"),
+            ("APP_ENV", "prod", "env", "prod"),
+            ("APP_LOG_LEVEL", "DEBUG", "log_level", "DEBUG"),
+            (
+                "APP_LOG_FORMAT",
+                "%(levelname)s | %(message)s",
+                "log_format",
+                "%(levelname)s | %(message)s",
+            ),
+            ("APP_DEBUG", "true", "debug", True),
+        ],
+    )
+    def test_allows_app_prefixed_environment_variables_to_override_defaults(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        env_name: str,
+        raw_value: str,
+        field_name: str,
+        expected: str | bool,
+    ) -> None:
+        # 準備
+        monkeypatch.setenv(env_name, raw_value)
+
+        # 実行
+        settings = Settings()
+
+        # 検証
+        assert getattr(settings, field_name) == expected
+
+    def test_ignores_environment_variables_without_app_prefix(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 準備
+        monkeypatch.setenv("ENV", "prod")
+
+        # 実行
+        settings = Settings()
+
+        # 検証
+        assert settings.env == "dev"
+
+    def test_rejects_unknown_env_values(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 準備
         monkeypatch.setenv("APP_ENV", "unknown")
+
+        # 実行 / 検証
         with pytest.raises(ValidationError):
             Settings()
 
 
 class TestGetSettings:
-    """get_settings() がキャッシュ付きシングルトンを返すこと。"""
+    """get_settings() のキャッシュ挙動を検証する。"""
 
-    def test_returns_settings_instance(self):
-        assert isinstance(get_settings(), Settings)
-
-    def test_same_instance_on_repeated_calls(self):
-        assert get_settings() is get_settings()
-
-    def test_cache_clear_creates_new_instance(self, monkeypatch):
+    def test_returns_cached_instance_while_cache_is_warm(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 準備
+        monkeypatch.setenv("APP_APP_NAME", "first-name")
         first = get_settings()
-        get_settings.cache_clear()
-        monkeypatch.setenv("APP_APP_NAME", "new-name")
+        monkeypatch.setenv("APP_APP_NAME", "second-name")
+
+        # 実行
         second = get_settings()
-        assert first is not second
+
+        # 検証
+        assert second is first
+        assert second.app_name == "first-name"
+
+    def test_reloads_settings_after_cache_clear(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 準備
+        monkeypatch.setenv("APP_APP_NAME", "first-name")
+        first = get_settings()
+        monkeypatch.setenv("APP_APP_NAME", "second-name")
+        get_settings.cache_clear()
+
+        # 実行
+        second = get_settings()
+
+        # 検証
+        assert second is not first
+        assert second.app_name == "second-name"

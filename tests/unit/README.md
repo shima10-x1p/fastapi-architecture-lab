@@ -5,4 +5,4 @@
 
 | ディレクトリ | テスト数 | 詳細 |
 |---|---|---|
-| core/shared | 23 | [README](core/shared/README.md) |
+| core/shared | 15 | [README](core/shared/README.md) |
