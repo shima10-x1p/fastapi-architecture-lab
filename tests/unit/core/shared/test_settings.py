@@ -14,6 +14,11 @@ APP_SETTING_ENV_VARS = (
     "APP_LOG_LEVEL",
     "APP_LOG_FORMAT",
     "APP_DEBUG",
+    "APP_OPEN_LIBRARY_BASE_URL",
+    "APP_OPEN_LIBRARY_TIMEOUT_SECONDS",
+    "APP_OPEN_LIBRARY_USER_AGENT",
+    "APP_OPEN_LIBRARY_CONTACT_EMAIL",
+    "APP_OPEN_LIBRARY_CACHE_TTL_SECONDS",
 )
 
 
@@ -25,6 +30,7 @@ def isolate_settings_resolution(
     for env_name in APP_SETTING_ENV_VARS:
         monkeypatch.delenv(env_name, raising=False)
 
+    monkeypatch.setenv("APP_OPEN_LIBRARY_CONTACT_EMAIL", "test@example.com")
     monkeypatch.chdir(tmp_path)
     get_settings.cache_clear()
 
@@ -43,10 +49,14 @@ class TestSettingsInitialization:
             ("env", "dev"),
             ("log_level", "INFO"),
             ("debug", False),
+            ("open_library_base_url", "https://openlibrary.org"),
+            ("open_library_timeout_seconds", 5.0),
+            ("open_library_user_agent", "fastapi-architecture-lab/0.1.0"),
+            ("open_library_cache_ttl_seconds", 300),
         ],
     )
     def test_uses_declared_defaults_when_app_env_vars_are_missing(
-        self, field_name: str, expected: str | bool
+        self, field_name: str, expected: str | bool | float | int
     ) -> None:
         # 準備
 
@@ -69,11 +79,16 @@ class TestSettingsInitialization:
         assert "%(message)s" in settings.log_format
 
     def test_loads_values_from_dotenv_when_environment_is_missing(
-        self, tmp_path: Path
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         # 準備
+        monkeypatch.delenv("APP_OPEN_LIBRARY_CONTACT_EMAIL", raising=False)
         tmp_path.joinpath(".env").write_text(
-            "APP_ENV=staging\nAPP_DEBUG=true\n",
+            (
+                "APP_ENV=staging\n"
+                "APP_DEBUG=true\n"
+                "APP_OPEN_LIBRARY_CONTACT_EMAIL=dotenv@example.com\n"
+            ),
             encoding="utf-8",
         )
 
@@ -83,6 +98,7 @@ class TestSettingsInitialization:
         # 検証
         assert settings.env == "staging"
         assert settings.debug is True
+        assert settings.open_library_contact_email == "dotenv@example.com"
 
     def test_environment_variables_override_dotenv_values(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -113,6 +129,36 @@ class TestSettingsInitialization:
                 "%(levelname)s | %(message)s",
             ),
             ("APP_DEBUG", "true", "debug", True),
+            (
+                "APP_OPEN_LIBRARY_BASE_URL",
+                "https://openlibrary.example.com/",
+                "open_library_base_url",
+                "https://openlibrary.example.com",
+            ),
+            (
+                "APP_OPEN_LIBRARY_TIMEOUT_SECONDS",
+                "7.5",
+                "open_library_timeout_seconds",
+                7.5,
+            ),
+            (
+                "APP_OPEN_LIBRARY_USER_AGENT",
+                "custom-agent/1.0",
+                "open_library_user_agent",
+                "custom-agent/1.0",
+            ),
+            (
+                "APP_OPEN_LIBRARY_CONTACT_EMAIL",
+                "override@example.com",
+                "open_library_contact_email",
+                "override@example.com",
+            ),
+            (
+                "APP_OPEN_LIBRARY_CACHE_TTL_SECONDS",
+                "120",
+                "open_library_cache_ttl_seconds",
+                120,
+            ),
         ],
     )
     def test_allows_app_prefixed_environment_variables_to_override_defaults(
@@ -121,7 +167,7 @@ class TestSettingsInitialization:
         env_name: str,
         raw_value: str,
         field_name: str,
-        expected: str | bool,
+        expected: str | bool | float | int,
     ) -> None:
         # 準備
         monkeypatch.setenv(env_name, raw_value)
@@ -153,6 +199,41 @@ class TestSettingsInitialization:
         # 実行 / 検証
         with pytest.raises(ValidationError):
             Settings()
+
+    def test_requires_open_library_contact_email(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 準備
+        monkeypatch.delenv("APP_OPEN_LIBRARY_CONTACT_EMAIL", raising=False)
+
+        # 実行 / 検証
+        with pytest.raises(ValidationError):
+            Settings()
+
+    def test_normalizes_trailing_slash_in_open_library_base_url(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 準備
+        monkeypatch.setenv(
+            "APP_OPEN_LIBRARY_BASE_URL", "https://openlibrary.org/"
+        )
+
+        # 実行
+        settings = Settings()
+
+        # 検証
+        assert settings.open_library_base_url == "https://openlibrary.org"
+
+    def test_builds_identifying_open_library_user_agent(self) -> None:
+        # 準備
+
+        # 実行
+        settings = Settings()
+
+        # 検証
+        assert settings.open_library_identifying_user_agent == (
+            "fastapi-architecture-lab/0.1.0 (contact: test@example.com)"
+        )
 
 
 class TestGetSettings:

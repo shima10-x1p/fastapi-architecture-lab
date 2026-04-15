@@ -8,7 +8,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # APP_LOG_FORMAT が未設定の場合に使う Python のログフォーマット文字列。
@@ -45,6 +45,50 @@ class Settings(BaseSettings):
         ),
     )
     debug: bool = Field(default=False)
+    open_library_base_url: str = Field(default="https://openlibrary.org")
+    open_library_timeout_seconds: float = Field(default=5.0, gt=0)
+    open_library_user_agent: str = Field(
+        default="fastapi-architecture-lab/0.1.0"
+    )
+    open_library_contact_email: str
+    open_library_cache_ttl_seconds: int = Field(default=300, ge=1)
+
+    @field_validator("open_library_base_url")
+    @classmethod
+    def normalize_open_library_base_url(cls, value: str) -> str:
+        """Open Library の base URL 末尾スラッシュを正規化する。"""
+        normalized_value = value.strip().rstrip("/")
+        if not normalized_value:
+            raise ValueError("Open Library の base URL は必須です。")
+        return normalized_value
+
+    @field_validator("open_library_user_agent")
+    @classmethod
+    def validate_open_library_user_agent(cls, value: str) -> str:
+        """Open Library へ送る User-Agent が空でないことを保証する。"""
+        normalized_value = value.strip()
+        if not normalized_value:
+            raise ValueError("Open Library の User-Agent は必須です。")
+        return normalized_value
+
+    @field_validator("open_library_contact_email")
+    @classmethod
+    def validate_open_library_contact_email(cls, value: str) -> str:
+        """Open Library へ連絡先として渡すメールアドレスを検証する。"""
+        normalized_value = value.strip()
+        if not normalized_value or "@" not in normalized_value:
+            raise ValueError(
+                "Open Library の contact email には有効なメールアドレスが必要です。"
+            )
+        return normalized_value
+
+    @property
+    def open_library_identifying_user_agent(self) -> str:
+        """Open Library 向けの識別付き User-Agent を返す。"""
+        return (
+            f"{self.open_library_user_agent}"
+            f" (contact: {self.open_library_contact_email})"
+        )
 
 
 @lru_cache(maxsize=1)

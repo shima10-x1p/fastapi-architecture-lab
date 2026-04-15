@@ -11,6 +11,14 @@
 | TestConfigureLogging | test_falls_back_to_info_for_unknown_log_level | configure_logging | 異常系 | 不正なログレベル文字列では INFO にフォールバックすること |
 | TestConfigureLogging | test_reconfiguration_keeps_single_handler_and_updates_formatter | configure_logging | 回帰 | 再設定時も handler が増殖せず最新フォーマットへ更新されること |
 
+## test_http_client.py
+
+| クラス | テスト名 | 対象 | 観点 | 意図 |
+|---|---|---|---|---|
+| TestMergeHeaders | test_allows_extra_headers_to_override_base_headers | merge_headers | 正常系 | 追加ヘッダがベースヘッダを上書きして統合されること |
+| TestCreateAsyncClient | test_sets_base_url_timeout_and_default_headers | create_async_client | 正常系 | base_url と timeout とデフォルトヘッダが AsyncClient に設定されること |
+| TestSendRequest | test_passes_params_and_headers_to_httpx_client | send_request | 正常系 | クエリパラメータと追加ヘッダが HTTP クライアントへ委譲されること |
+
 ## test_settings.py
 
 | クラス | テスト名 | 対象 | 観点 | 意図 |
