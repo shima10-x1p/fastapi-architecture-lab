@@ -5,177 +5,141 @@ info:
   version: "0.1.0"
   description: |
     Python 3.14 + FastAPI による Ports and Adapters アーキテクチャの検証 Lab。
-    Open Library の書誌情報を取り込み、個人の読書状態・ノートを管理する。
+    お気に入り YouTube 動画の管理と、埋め込みプレイヤー HTML の取得を提供する。
 
 servers:
   - url: http://localhost:8000
     description: ローカル開発サーバー
 
+# Lab のため認証なし
+security: []
+
 tags:
-  - name: book-candidates
-    description: Open Library の外部書誌検索
-  - name: books
-    description: 取り込み済み書籍の管理
-  - name: notes
-    description: 書籍へのノート追加
+  - name: favorites
+    description: お気に入り YouTube 動画の CRUD 操作
+  - name: embed
+    description: 埋め込みプレイヤー HTML の取得
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 paths:
 
-  # ---------- 外部書誌検索 ----------
-  /v1/book-candidates:
+  # ---------- お気に入り一覧 / 追加 ----------
+  /v1/favorites:
     get:
-      operationId: searchBookCandidates
-      summary: 外部書誌を検索する
-      description: |
-        Open Library の Search API を経由して書籍候補を返す。
-        結果はキャッシュされる（同一クエリの重複リクエストを抑制するため）。
-      tags: [book-candidates]
+      operationId: listFavorites
+      summary: お気に入り動画の一覧を取得する
+      tags: [favorites]
       parameters:
-        - $ref: "#/components/parameters/queryParam"
-      responses:
-        "200":
-          description: 検索結果の書籍候補一覧
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BookCandidateListResponse"
-        "422":
-          $ref: "#/components/responses/UnprocessableEntity"
-
-  # ---------- 書籍一覧 / 書籍取り込み ----------
-  /v1/books:
-    get:
-      operationId: listBooks
-      summary: 取り込み済み書籍の一覧を取得する
-      tags: [books]
-      parameters:
-        - $ref: "#/components/parameters/statusFilter"
         - $ref: "#/components/parameters/limit"
         - $ref: "#/components/parameters/offset"
       responses:
         "200":
-          description: 書籍一覧（ページネーション付き）
+          description: お気に入り一覧（ページネーション付き）
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BookListResponse"
+                $ref: "#/components/schemas/FavoriteListResponse"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
-
-  /v1/books/import:
     post:
-      operationId: importBook
-      summary: 外部書誌を取り込む
+      operationId: addFavorite
+      summary: お気に入り動画を追加する
       description: |
-        Open Library のキーを指定して書籍を取り込む。
-        既に取り込み済みの場合は 409 を返す。
-      tags: [books]
+        クライアントが動画のメタデータを全て送信する。
+        同一 videoId が既に登録されている場合は 409 を返す。
+      tags: [favorites]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ImportBookRequest"
+              $ref: "#/components/schemas/CreateFavoriteRequest"
       responses:
         "201":
-          description: 取り込み完了
+          description: お気に入り追加完了
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Book"
+                $ref: "#/components/schemas/Favorite"
         "409":
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
 
-  # ---------- 書籍詳細 / 読書状態更新 ----------
-  /v1/books/{bookId}:
+  # ---------- お気に入り単体取得 / 更新 / 削除 ----------
+  /v1/favorites/{videoId}:
     parameters:
-      - $ref: "#/components/parameters/bookId"
+      - $ref: "#/components/parameters/videoId"
     get:
-      operationId: getBook
-      summary: 書籍の詳細を取得する
-      tags: [books]
+      operationId: getFavorite
+      summary: お気に入り動画を取得する
+      tags: [favorites]
       responses:
         "200":
-          description: 書籍詳細
+          description: お気に入り詳細
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Book"
+                $ref: "#/components/schemas/Favorite"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
     patch:
-      operationId: updateBook
-      summary: 読書状態を更新する
-      tags: [books]
+      operationId: updateFavorite
+      summary: お気に入り動画を更新する（memo・tags）
+      tags: [favorites]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateBookRequest"
+              $ref: "#/components/schemas/UpdateFavoriteRequest"
       responses:
         "200":
-          description: 更新後の書籍詳細
+          description: 更新後のお気に入り詳細
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Book"
+                $ref: "#/components/schemas/Favorite"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
-
-  # ---------- ノート追加 ----------
-  /v1/books/{bookId}/notes:
-    parameters:
-      - $ref: "#/components/parameters/bookId"
-    post:
-      operationId: addNote
-      summary: 書籍にノートを追加する
-      tags: [notes]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AddNoteRequest"
+    delete:
+      operationId: deleteFavorite
+      summary: お気に入り動画を削除する
+      tags: [favorites]
       responses:
-        "201":
-          description: 追加されたノート
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Note"
+        "204":
+          description: 削除完了
         "404":
           $ref: "#/components/responses/NotFound"
-        "422":
-          $ref: "#/components/responses/UnprocessableEntity"
 
-  # ---------- メタデータ再取得 ----------
-  /v1/books/{bookId}/metadata:refresh:
+  # ---------- 埋め込みプレイヤー ----------
+  /v1/favorites/{videoId}/embed:
     parameters:
-      - $ref: "#/components/parameters/bookId"
-    post:
-      operationId: refreshBookMetadata
-      summary: Open Library から書籍のメタデータを再取得する
+      - $ref: "#/components/parameters/videoId"
+    get:
+      operationId: getEmbedPlayer
+      summary: 埋め込みプレイヤーの HTML スニペットを取得する
       description: |
-        書籍の著者・出版社・説明文などを Open Library から最新情報で上書きする。
-        カバー画像 URL も更新される。
-      tags: [books]
+        指定したお気に入り動画の `<iframe>` 埋め込み HTML を返す。
+        width / height / autoplay をクエリパラメータでカスタマイズできる。
+      tags: [embed]
+      parameters:
+        - $ref: "#/components/parameters/width"
+        - $ref: "#/components/parameters/height"
+        - $ref: "#/components/parameters/autoplay"
       responses:
         "200":
-          description: メタデータ更新後の書籍詳細
+          description: 埋め込み HTML
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Book"
+                $ref: "#/components/schemas/EmbedResponse"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
@@ -188,33 +152,15 @@ components:
 
   # ---------- Parameters ----------
   parameters:
-    bookId:
-      name: bookId
+    videoId:
+      name: videoId
       in: path
       required: true
-      description: 書籍の UUID
+      description: YouTube の動画 ID
       schema:
         type: string
-        format: uuid
-        example: "01951a2b-3c4d-7e8f-9a0b-1c2d3e4f5a6b"
-
-    queryParam:
-      name: q
-      in: query
-      required: true
-      description: 検索キーワード（タイトル・著者名など）
-      schema:
-        type: string
-        minLength: 1
-        example: "Clean Architecture"
-
-    statusFilter:
-      name: status
-      in: query
-      required: false
-      description: 読書状態でフィルタリング
-      schema:
-        $ref: "#/components/schemas/ReadingStatus"
+        pattern: "^[a-zA-Z0-9_-]{11}$"
+        example: "dQw4w9WgXcQ"
 
     limit:
       name: limit
@@ -237,144 +183,129 @@ components:
         minimum: 0
         default: 0
 
+    width:
+      name: width
+      in: query
+      required: false
+      description: 埋め込みプレイヤーの幅（px）
+      schema:
+        type: integer
+        minimum: 200
+        maximum: 1920
+        default: 560
+
+    height:
+      name: height
+      in: query
+      required: false
+      description: 埋め込みプレイヤーの高さ（px）
+      schema:
+        type: integer
+        minimum: 113
+        maximum: 1080
+        default: 315
+
+    autoplay:
+      name: autoplay
+      in: query
+      required: false
+      description: 自動再生を有効にするか
+      schema:
+        type: boolean
+        default: false
+
   # ---------- Schemas ----------
   schemas:
 
-    ReadingStatus:
-      type: string
-      enum:
-        - want_to_read
-        - reading
-        - completed
-      description: |
-        - `want_to_read`: 読みたい
-        - `reading`: 読書中
-        - `completed`: 読了
-
-    BookCandidate:
+    Favorite:
       type: object
-      description: Open Library から取得した書籍候補（未取り込み）
+      description: お気に入り登録済みの YouTube 動画
       required:
-        - openLibraryKey
+        - videoId
         - title
-        - authors
-      properties:
-        openLibraryKey:
-          type: string
-          description: "Open Library の Works キー (例: /works/OL45804W)"
-          example: "/works/OL45804W"
-        title:
-          type: string
-          example: "Clean Architecture"
-        authors:
-          type: array
-          items:
-            type: string
-          example: ["Robert C. Martin"]
-        isbn:
-          type: ["string", "null"]
-          example: "9780134494166"
-        coverUrl:
-          type: ["string", "null"]
-          format: uri
-          example: "https://covers.openlibrary.org/b/id/8091016-M.jpg"
-        publisher:
-          type: ["string", "null"]
-          example: "Prentice Hall"
-        publishedYear:
-          type: ["integer", "null"]
-          example: 2017
-
-    BookCandidateListResponse:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/BookCandidate"
-
-    Book:
-      type: object
-      description: 取り込み済みの書籍
-      required:
-        - bookId
-        - openLibraryKey
-        - title
-        - authors
-        - status
-        - notes
+        - tags
         - createdAt
         - updatedAt
       properties:
-        bookId:
+        videoId:
           type: string
-          format: uuid
-          example: "01951a2b-3c4d-7e8f-9a0b-1c2d3e4f5a6b"
-        openLibraryKey:
-          type: string
-          example: "/works/OL45804W"
+          description: YouTube の動画 ID
+          example: "dQw4w9WgXcQ"
         title:
           type: string
-          example: "Clean Architecture"
-        authors:
+          example: "Rick Astley - Never Gonna Give You Up"
+        channelName:
+          type: ["string", "null"]
+          example: "Rick Astley"
+        thumbnailUrl:
+          type: ["string", "null"]
+          format: uri
+          example: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+        memo:
+          type: ["string", "null"]
+          example: "80年代の名曲。テスト用にも便利。"
+        tags:
           type: array
           items:
             type: string
-          example: ["Robert C. Martin"]
-        isbn:
-          type: ["string", "null"]
-          example: "9780134494166"
-        coverUrl:
-          type: ["string", "null"]
-          format: uri
-          example: "https://covers.openlibrary.org/b/id/8091016-M.jpg"
-        publisher:
-          type: ["string", "null"]
-          example: "Prentice Hall"
-        publishedYear:
-          type: ["integer", "null"]
-          example: 2017
-        description:
-          type: ["string", "null"]
-          example: "A craftsman's guide to software structure and design."
-        status:
-          $ref: "#/components/schemas/ReadingStatus"
-        notes:
-          type: array
-          items:
-            $ref: "#/components/schemas/Note"
+          example: ["music", "80s"]
         createdAt:
           type: string
           format: date-time
-          example: "2026-04-10T09:00:00Z"
+          example: "2026-04-16T09:00:00Z"
         updatedAt:
           type: string
           format: date-time
-          example: "2026-04-10T12:30:00Z"
+          example: "2026-04-16T12:30:00Z"
 
-    Note:
+    CreateFavoriteRequest:
       type: object
-      description: 書籍に紐づくノート
+      additionalProperties: false
       required:
-        - noteId
-        - content
-        - createdAt
+        - videoId
+        - title
       properties:
-        noteId:
+        videoId:
           type: string
-          format: uuid
-          example: "0195dead-beef-7000-8000-000000000001"
-        content:
+          description: YouTube の動画 ID
+          pattern: "^[a-zA-Z0-9_-]{11}$"
+          example: "dQw4w9WgXcQ"
+        title:
           type: string
           minLength: 1
-          example: "第3章のクリーンアーキテクチャの依存ルールが特に参考になった。"
-        createdAt:
-          type: string
-          format: date-time
-          example: "2026-04-10T10:00:00Z"
+          example: "Rick Astley - Never Gonna Give You Up"
+        channelName:
+          type: ["string", "null"]
+          example: "Rick Astley"
+        thumbnailUrl:
+          type: ["string", "null"]
+          format: uri
+          example: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+        memo:
+          type: ["string", "null"]
+          example: "80年代の名曲。テスト用にも便利。"
+        tags:
+          type: array
+          items:
+            type: string
+          default: []
+          example: ["music", "80s"]
 
-    BookListResponse:
+    UpdateFavoriteRequest:
+      type: object
+      additionalProperties: false
+      description: memo と tags のみ更新可能。送信したフィールドだけ上書きされる。
+      properties:
+        memo:
+          type: ["string", "null"]
+          example: "メモを更新しました。"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["music", "favorites"]
+
+    FavoriteListResponse:
       type: object
       required:
         - items
@@ -385,10 +316,10 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Book"
+            $ref: "#/components/schemas/Favorite"
         total:
           type: integer
-          description: フィルタ条件に一致する総件数
+          description: 登録済みお気に入りの総件数
           example: 42
         limit:
           type: integer
@@ -397,36 +328,20 @@ components:
           type: integer
           example: 0
 
-    ImportBookRequest:
+    EmbedResponse:
       type: object
-      additionalProperties: false
+      description: 埋め込みプレイヤーの HTML スニペット
       required:
-        - openLibraryKey
+        - videoId
+        - html
       properties:
-        openLibraryKey:
+        videoId:
           type: string
-          description: "Open Library の Works キー (例: /works/OL45804W)"
-          example: "/works/OL45804W"
-
-    UpdateBookRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - status
-      properties:
-        status:
-          $ref: "#/components/schemas/ReadingStatus"
-
-    AddNoteRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - content
-      properties:
-        content:
+          example: "dQw4w9WgXcQ"
+        html:
           type: string
-          minLength: 1
-          example: "第3章のクリーンアーキテクチャの依存ルールが特に参考になった。"
+          description: "<iframe> タグを含む HTML スニペット"
+          example: '<iframe width="560" height="315" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allowfullscreen></iframe>'
 
     HTTPValidationError:
       type: object
@@ -458,7 +373,7 @@ components:
         detail:
           type: string
           description: エラーの概要
-          example: "Book not found"
+          example: "Favorite not found"
 
   # ---------- Responses ----------
   responses:
@@ -469,16 +384,16 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
           example:
-            detail: "Book not found"
+            detail: "Favorite not found"
 
     Conflict:
-      description: リソースが既に存在する（重複取り込みなど）
+      description: リソースが既に存在する（重複登録）
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
           example:
-            detail: "Book already imported"
+            detail: "Favorite already exists"
 
     UnprocessableEntity:
       description: リクエストの形式・バリデーションエラー（FastAPI デフォルト）
