@@ -27,6 +27,8 @@ paths:
 
   # ---------- お気に入り一覧 / 追加 ----------
   /v1/favorites:
+    parameters:
+      - $ref: "#/components/parameters/xRequestId"
     get:
       operationId: listFavorites
       summary: お気に入り動画の一覧を取得する
@@ -72,6 +74,7 @@ paths:
   /v1/favorites/{videoId}:
     parameters:
       - $ref: "#/components/parameters/videoId"
+      - $ref: "#/components/parameters/xRequestId"
     get:
       operationId: getFavorite
       summary: お気に入り動画を取得する
@@ -122,6 +125,7 @@ paths:
   /v1/favorites/{videoId}/embed:
     parameters:
       - $ref: "#/components/parameters/videoId"
+      - $ref: "#/components/parameters/xRequestId"
     get:
       operationId: getEmbedPlayer
       summary: 埋め込みプレイヤーの HTML スニペットを取得する
@@ -152,6 +156,19 @@ components:
 
   # ---------- Parameters ----------
   parameters:
+    xRequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: |
+        クライアントが任意に設定するトレースID。
+        ログへの記録やリクエスト追跡に使用する。
+        省略時はサーバー側で UUID を自動生成する。
+      schema:
+        type: string
+        format: uuid
+        example: "550e8400-e29b-41d4-a716-446655440000"
+
     videoId:
       name: videoId
       in: path
