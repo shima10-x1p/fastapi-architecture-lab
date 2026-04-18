@@ -31,8 +31,7 @@ src/
       outbound/           # CSV / SQLite / S3 など保存先の実装
   generated/              # OpenAPI Generator による自動生成コード（編集禁止）
 tests/
-  unit/                   # usecase / domain の unit テスト
-  integration/            # adapter 単体 / router テスト
+  unit/                   # 作成したコード の unit テスト
 ```
 
 テストは `src/` に混ぜず `tests/` に分離すること（ユーザー設定）。
