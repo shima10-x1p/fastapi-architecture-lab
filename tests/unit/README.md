@@ -5,6 +5,7 @@
 
 | ディレクトリ | テスト数 | 詳細 |
 |---|---|---|
+| core/adapters/inbound | 7 | [README](core/adapters/inbound/README.md) |
 | core/adapters/outbound | 11 | [README](core/adapters/outbound/README.md) |
 | core/application | 2 | [README](core/application/README.md) |
 | core/application/usecases | 8 | [README](core/application/usecases/README.md) |
