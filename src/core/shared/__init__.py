@@ -5,6 +5,12 @@ from .dependencies import (
     clear_settings_cache,
     get_settings,
 )
+from .exceptions import (
+    ApplicationError,
+    ConflictError,
+    DomainError,
+    NotFoundError,
+)
 from .logger import (
     APP_LOG_FORMAT_ENV_VAR,
     APP_LOG_LEVEL_ENV_VAR,
@@ -26,4 +32,8 @@ __all__ = [
     "clear_settings_cache",
     "get_settings",
     "AppSettings",
+    "ApplicationError",
+    "ConflictError",
+    "DomainError",
+    "NotFoundError",
 ]
