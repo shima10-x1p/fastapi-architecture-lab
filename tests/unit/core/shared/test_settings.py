@@ -1,6 +1,7 @@
 """共有設定ユーティリティの unit test。"""
 
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -48,6 +49,30 @@ def test_get_settings_reads_values_from_os_environment(
     assert settings.app_name == "favorite-api"
     assert settings.app_env == "test"
     assert settings.debug is True
+
+
+def test_app_settings_uses_default_favorites_csv_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """favorites_csv_path は既定で data/favorites.csv を使う。"""
+
+    monkeypatch.delenv("FAVORITES_CSV_PATH", raising=False)
+
+    settings = AppSettings()
+
+    assert settings.favorites_csv_path == Path("data/favorites.csv")
+
+
+def test_app_settings_reads_favorites_csv_path_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FAVORITES_CSV_PATH 環境変数で CSV パスを上書きできる。"""
+
+    monkeypatch.setenv("FAVORITES_CSV_PATH", "custom/favorites.csv")
+
+    settings = AppSettings()
+
+    assert settings.favorites_csv_path == Path("custom/favorites.csv")
 
 
 def test_app_settings_rejects_empty_app_name(
