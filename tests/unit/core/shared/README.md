@@ -1,5 +1,15 @@
 # core/shared テスト一覧
 
+## test_dependencies.py
+
+| クラス | テスト名 | 対象 | 観点 | 意図 |
+|---|---|---|---|---|
+| （なし） | test_get_csv_favorite_repository_reuses_repository_for_same_path | get_csv_favorite_repository | 正常系 | 同じ CSV パスでは同じ repository instance を再利用すること |
+| （なし） | test_get_csv_favorite_repository_recreates_repository_after_cache_clear | get_csv_favorite_repository / clear_csv_favorite_repository_cache | 回帰 | cache 破棄後は新しい repository instance を返すこと |
+| （なし） | test_get_add_favorite_usecase_returns_add_favorite_usecase | get_add_favorite_usecase | 正常系 | 追加 usecase provider が AddFavoriteUsecase を返すこと |
+| （なし） | test_get_get_favorite_usecase_returns_get_favorite_usecase | get_get_favorite_usecase | 正常系 | 単体取得 usecase provider が GetFavoriteUsecase を返すこと |
+| （なし） | test_get_list_favorites_usecase_returns_list_favorites_usecase | get_list_favorites_usecase | 正常系 | 一覧取得 usecase provider が ListFavoritesUsecase を返すこと |
+
 ## test_exceptions.py
 
 | クラス | テスト名 | 対象 | 観点 | 意図 |
@@ -34,5 +44,7 @@
 |---|---|---|---|---|
 | （なし） | test_app_settings_uses_defaults_when_environment_variables_are_missing | AppSettings | 正常系 | 環境変数未設定時に既定値を採用すること |
 | （なし） | test_get_settings_reads_values_from_os_environment | get_settings | 正常系 | OS 環境変数から設定値を読み込めること |
+| （なし） | test_app_settings_uses_default_favorites_csv_path | AppSettings | 正常系 | favorites_csv_path の既定値が data/favorites.csv であること |
+| （なし） | test_app_settings_reads_favorites_csv_path_from_environment | AppSettings | 正常系 | FAVORITES_CSV_PATH で CSV パスを上書きできること |
 | （なし） | test_app_settings_rejects_empty_app_name | AppSettings | 境界値/異常系 | 空文字のアプリ名を不正値として扱うこと |
 | （なし） | test_get_settings_cache_can_be_cleared_for_reloading | get_settings / clear_settings_cache | 回帰 | 設定キャッシュ破棄後に最新の環境変数を再読込できること |

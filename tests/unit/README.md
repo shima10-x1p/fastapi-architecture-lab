@@ -7,5 +7,6 @@
 |---|---|---|
 | core/adapters/outbound | 11 | [README](core/adapters/outbound/README.md) |
 | core/application | 2 | [README](core/application/README.md) |
+| core/application/usecases | 8 | [README](core/application/usecases/README.md) |
 | core/domain | 7 | [README](core/domain/README.md) |
-| core/shared | 22 | [README](core/shared/README.md) |
+| core/shared | 29 | [README](core/shared/README.md) |

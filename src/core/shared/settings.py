@@ -1,5 +1,7 @@
 """環境変数から共有設定を読み込むユーティリティ。"""
 
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,4 +29,8 @@ class AppSettings(BaseSettings):
     debug: bool = Field(
         default=False,
         validation_alias="APP_DEBUG",
+    )
+    favorites_csv_path: Path = Field(
+        default=Path("data/favorites.csv"),
+        validation_alias="FAVORITES_CSV_PATH",
     )
